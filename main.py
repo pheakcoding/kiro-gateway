@@ -211,66 +211,46 @@ def validate_configuration() -> None:
     """
     errors = []
     
-    # Check if .env file exists
-    env_file = Path(".env")
-    env_example = Path(".env.example")
+    # Check credentials availability
+    # On Railway/cloud: env vars are set directly (no .env file needed)
+    # Locally: .env file is typically used
+    has_refresh_token = bool(REFRESH_TOKEN)
+    has_creds_file = bool(KIRO_CREDS_FILE)
+    has_cli_db = bool(KIRO_CLI_DB_FILE)
     
-    if not env_file.exists():
+    # Check if creds file actually exists
+    if KIRO_CREDS_FILE:
+        creds_path = Path(KIRO_CREDS_FILE).expanduser()
+        if not creds_path.exists():
+            has_creds_file = False
+            logger.warning(f"KIRO_CREDS_FILE not found: {KIRO_CREDS_FILE}")
+    
+    # Check if CLI database file actually exists
+    if KIRO_CLI_DB_FILE:
+        cli_db_path = Path(KIRO_CLI_DB_FILE).expanduser()
+        if not cli_db_path.exists():
+            has_cli_db = False
+            logger.warning(f"KIRO_CLI_DB_FILE not found: {KIRO_CLI_DB_FILE}")
+    
+    # If no credentials found, show helpful error message
+    if not has_refresh_token and not has_creds_file and not has_cli_db:
         errors.append(
-            ".env file not found!\n"
+            "No Kiro credentials configured!\n"
             "\n"
-            "To get started:\n"
-            "1. Create .env or rename from .env.example:\n"
-            "   cp .env.example .env\n"
+            "For local development:\n"
+            "  1. Copy .env.example to .env: cp .env.example .env\n"
+            "  2. Edit .env and set your credentials\n"
             "\n"
-            "2. Edit .env and configure your credentials:\n"
-            "   2.1. Set you super-secret password as PROXY_API_KEY\n"
-            "   2.2. Set your Kiro credentials:\n"
-            "      - 1 way: KIRO_CREDS_FILE to your Kiro credentials JSON file\n"
-            "      - 2 way: REFRESH_TOKEN from Kiro IDE traffic\n"
+            "For Railway/cloud deployment:\n"
+            "  Set environment variables in your dashboard\n"
+            "\n"
+            "Required credentials (choose one):\n"
+            "  - KIRO_CREDS_FILE: path to Kiro credentials JSON file\n"
+            "  - REFRESH_TOKEN: refresh token from Kiro IDE traffic\n"
+            "  - KIRO_CLI_DB_FILE: kiro-cli SQLite database path\n"
             "\n"
             "See README.md for detailed instructions."
         )
-    else:
-        # .env exists, check for credentials
-        has_refresh_token = bool(REFRESH_TOKEN)
-        has_creds_file = bool(KIRO_CREDS_FILE)
-        has_cli_db = bool(KIRO_CLI_DB_FILE)
-        
-        # Check if creds file actually exists
-        if KIRO_CREDS_FILE:
-            creds_path = Path(KIRO_CREDS_FILE).expanduser()
-            if not creds_path.exists():
-                has_creds_file = False
-                logger.warning(f"KIRO_CREDS_FILE not found: {KIRO_CREDS_FILE}")
-        
-        # Check if CLI database file actually exists
-        if KIRO_CLI_DB_FILE:
-            cli_db_path = Path(KIRO_CLI_DB_FILE).expanduser()
-            if not cli_db_path.exists():
-                has_cli_db = False
-                logger.warning(f"KIRO_CLI_DB_FILE not found: {KIRO_CLI_DB_FILE}")
-        
-        if not has_refresh_token and not has_creds_file and not has_cli_db:
-            errors.append(
-                "No Kiro credentials configured!\n"
-                "\n"
-                "   Configure one of the following in your .env file:\n"
-                "\n"
-                "Set you super-secret password as PROXY_API_KEY\n"
-                "   PROXY_API_KEY=\"my-super-secret-password-123\"\n"
-                "\n"
-                "   Option 1 (Recommended): JSON credentials file\n"
-                "      KIRO_CREDS_FILE=\"path/to/your/kiro-credentials.json\"\n"
-                "\n"
-                "   Option 2: Refresh token\n"
-                "      REFRESH_TOKEN=\"your_refresh_token_here\"\n"
-                "\n"
-                "   Option 3: kiro-cli SQLite database (AWS SSO)\n"
-                "      KIRO_CLI_DB_FILE=\"~/.local/share/kiro-cli/data.sqlite3\"\n"
-                "\n"
-                "   See README.md for how to obtain credentials."
-            )
     
     # Print errors and exit if any
     if errors:
