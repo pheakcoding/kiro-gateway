@@ -30,8 +30,13 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Get project root directory (parent of kiro/ folder)
+PROJECT_ROOT = Path(__file__).parent.parent
+
+# Load environment variables from .env file in project root
+# This ensures .env is found regardless of current working directory (important for Railway/deployment)
+_env_file = PROJECT_ROOT / ".env"
+load_dotenv(dotenv_path=_env_file if _env_file.exists() else None)
 
 
 def _get_raw_env_value(var_name: str, env_file: str = ".env") -> Optional[str]:

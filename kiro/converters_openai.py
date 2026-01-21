@@ -79,14 +79,21 @@ def _extract_tool_calls_from_openai(msg: ChatMessage) -> List[Dict[str, Any]]:
     """
     Extracts tool calls from OpenAI assistant message.
     
+    Handles both:
+    - OpenAI format: tool_calls field with function wrapper
+    - Anthropic/Cursor format: tool_use blocks in content
+    
     Args:
         msg: OpenAI ChatMessage
     
     Returns:
         List of tool calls in unified format
     """
+    import json
+    
     tool_calls = []
     
+    # Extract from tool_calls field (standard OpenAI format)
     if msg.tool_calls:
         for tc in msg.tool_calls:
             if isinstance(tc, dict):
@@ -96,6 +103,23 @@ def _extract_tool_calls_from_openai(msg: ChatMessage) -> List[Dict[str, Any]]:
                     "function": {
                         "name": tc.get("function", {}).get("name", ""),
                         "arguments": tc.get("function", {}).get("arguments", "{}")
+                    }
+                })
+    
+    # Extract from content blocks (Anthropic/Cursor format with tool_use blocks)
+    if isinstance(msg.content, list):
+        for item in msg.content:
+            if isinstance(item, dict) and item.get("type") == "tool_use":
+                # Convert Anthropic tool_use to OpenAI tool_call format
+                input_data = item.get("input", {})
+                # Serialize input to JSON string for OpenAI format
+                arguments = json.dumps(input_data) if isinstance(input_data, dict) else str(input_data)
+                tool_calls.append({
+                    "id": item.get("id", ""),
+                    "type": "function",
+                    "function": {
+                        "name": item.get("name", ""),
+                        "arguments": arguments
                     }
                 })
     
@@ -219,6 +243,11 @@ def convert_openai_tools_to_unified(tools: Optional[List[Tool]]) -> Optional[Lis
     unified_tools = []
     for tool in tools:
         if tool.type != "function":
+            continue
+        
+        # Skip tools without function definition (shouldn't happen after normalization)
+        if not tool.function:
+            logger.warning(f"Skipping tool without function definition")
             continue
         
         unified_tools.append(UnifiedTool(

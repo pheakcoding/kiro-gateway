@@ -923,11 +923,21 @@ def ensure_assistant_before_tool_results(messages: List[UnifiedMessage]) -> Tupl
         # Check if this message has tool_results
         if msg.tool_results:
             # Check if the previous message is an assistant with tool_calls
-            has_preceding_assistant = (
-                result and
-                result[-1].role == "assistant" and
-                result[-1].tool_calls
-            )
+            # Also check for tool_use blocks in content (Anthropic/Cursor format)
+            has_tool_calls = False
+            if result and result[-1].role == "assistant":
+                prev_msg = result[-1]
+                # Check tool_calls field
+                if prev_msg.tool_calls:
+                    has_tool_calls = True
+                # Also check for tool_use blocks in content (fallback for Anthropic format)
+                elif isinstance(prev_msg.content, list):
+                    for item in prev_msg.content:
+                        if isinstance(item, dict) and item.get("type") == "tool_use":
+                            has_tool_calls = True
+                            break
+            
+            has_preceding_assistant = has_tool_calls
             
             if not has_preceding_assistant:
                 # We cannot create a valid synthetic assistant message because we don't know

@@ -465,19 +465,43 @@ class TestTool:
         print(f"Comparing type: Expected 'function', Got '{tool.type}'")
         assert tool.type == "function"
     
-    def test_requires_function(self):
+    def test_accepts_cursor_format(self):
         """
-        What it does: Verifies that function is required.
-        Purpose: Ensure validation fails without function.
+        What it does: Verifies that Cursor AI flat format is accepted and normalized.
+        Purpose: Ensure compatibility with Cursor AI which sends tools without function wrapper.
         """
-        print("Setup: Attempting to create Tool without function...")
+        print("Setup: Creating Tool with Cursor AI format (flat structure)...")
+        tool = Tool(
+            name="Shell",
+            description="Execute shell command",
+            input_schema={"type": "object", "properties": {"command": {"type": "string"}}}
+        )
         
-        print("Action: Creating model (should raise ValidationError)...")
-        with pytest.raises(ValidationError) as exc_info:
-            Tool(type="function")
+        print(f"Checking function was created: {tool.function}")
+        assert tool.function is not None
+        assert tool.function.name == "Shell"
+        assert tool.function.description == "Execute shell command"
+        assert tool.function.parameters == {"type": "object", "properties": {"command": {"type": "string"}}}
+        assert tool.type == "function"
+    
+    def test_accepts_openai_format(self):
+        """
+        What it does: Verifies that standard OpenAI format still works.
+        Purpose: Ensure backward compatibility with OpenAI format.
+        """
+        print("Setup: Creating Tool with standard OpenAI format...")
+        tool = Tool(
+            type="function",
+            function=ToolFunction(
+                name="test_func",
+                description="Test function",
+                parameters={"type": "object"}
+            )
+        )
         
-        print(f"ValidationError raised: {exc_info.value}")
-        assert "function" in str(exc_info.value)
+        print(f"Checking tool: {tool.function.name}")
+        assert tool.function.name == "test_func"
+        assert tool.type == "function"
 
 
 # ==================================================================================================

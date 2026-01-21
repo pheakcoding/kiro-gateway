@@ -27,7 +27,7 @@ providing validation and serialization.
 import time
 from typing import Any, Dict, List, Optional, Union
 from typing_extensions import Annotated
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ==================================================================================================
@@ -96,18 +96,72 @@ class ToolFunction(BaseModel):
     name: str
     description: Optional[str] = None
     parameters: Optional[Dict[str, Any]] = None
+    
+    model_config = {"extra": "allow"}
 
 
 class Tool(BaseModel):
     """
     Tool in OpenAI format.
     
+    Supports both standard OpenAI format and Cursor AI format:
+    - OpenAI: {"type": "function", "function": {"name": "...", "parameters": {...}}}
+    - Cursor: {"name": "...", "description": "...", "input_schema": {...}}
+    
     Attributes:
         type: Tool type (usually "function")
-        function: Function description
+        function: Function description (optional, will be built from flat fields if missing)
+        name: Function name (Cursor format - used when function is missing)
+        description: Function description (Cursor format)
+        input_schema: Parameters schema (Cursor format - mapped to parameters)
     """
     type: str = "function"
-    function: ToolFunction
+    function: Optional[ToolFunction] = None
+    
+    # Cursor AI format fields (flat structure)
+    name: Optional[str] = None
+    description: Optional[str] = None
+    input_schema: Optional[Dict[str, Any]] = None
+    
+    model_config = {"extra": "allow"}
+    
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_tool_format(cls, data: Any) -> Any:
+        """
+        Normalize different tool formats to standard OpenAI format.
+        
+        Handles:
+        1. Standard OpenAI format (with function wrapper) - pass through
+        2. Cursor AI format (flat with name, description, input_schema) - convert
+        """
+        if not isinstance(data, dict):
+            return data
+        
+        # If already has 'function' field with proper structure, use as-is
+        if 'function' in data and isinstance(data.get('function'), dict):
+            return data
+        
+        # Cursor AI format: flat structure with name, description, input_schema
+        if 'name' in data and 'function' not in data:
+            # Build function from flat fields
+            function_data = {
+                'name': data.get('name'),
+                'description': data.get('description'),
+            }
+            
+            # Map input_schema to parameters (Cursor uses input_schema, OpenAI uses parameters)
+            if 'input_schema' in data:
+                function_data['parameters'] = data.get('input_schema')
+            elif 'parameters' in data:
+                function_data['parameters'] = data.get('parameters')
+            
+            return {
+                'type': data.get('type', 'function'),
+                'function': function_data
+            }
+        
+        return data
 
 
 class ChatCompletionRequest(BaseModel):
