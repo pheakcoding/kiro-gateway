@@ -192,6 +192,7 @@ async def messages(
     shared_client = request.app.state.http_client
     http_client = KiroHttpClient(auth_manager, shared_client=shared_client)
     url = f"{auth_manager.api_host}/generateAssistantResponse"
+    logger.debug(f"Kiro API URL: {url}")
     
     # Prepare data for token counting
     # Convert Pydantic models to dicts for tokenizer

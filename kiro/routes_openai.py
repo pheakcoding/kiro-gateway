@@ -209,6 +209,8 @@ async def chat_completions(request: Request, request_data: ChatCompletionRequest
     shared_client = request.app.state.http_client
     http_client = KiroHttpClient(auth_manager, shared_client=shared_client)
     url = f"{auth_manager.api_host}/generateAssistantResponse"
+    logger.debug(f"Kiro API URL: {url}")
+    
     try:
         # Make request to Kiro API (for both streaming and non-streaming modes)
         # Important: we wait for Kiro response BEFORE returning StreamingResponse,
